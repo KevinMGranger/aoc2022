@@ -116,17 +116,38 @@ class Warehouse:
     crates: list[list[Crate]]
     "The crates by row and then column"
 
-    def run(self, instructions: Iterable[Instruction]):
+    def run_9000(self, instructions: Iterable[Instruction]):
         for instruction in instructions:
-            count, source, target = instruction
+            self.move_9000(instruction)
 
-            # 1-ordinal to 0-indexing
-            source -= 1
-            target -= 1
 
-            for _i in range(0, count):
-                crate = self.crates[source].pop()
-                self.crates[target].append(crate)
+    def run_9001(self, instructions: Iterable[Instruction]):
+        for instruction in instructions:
+            self.move_9001(instruction)
+
+    def move_9001(self, instruction: Instruction):
+        count, source, target = instruction
+
+        # 1-ordinal to 0-indexing
+        source -= 1
+        target -= 1
+
+        stack = self.crates[source][-count:]
+        del self.crates[source][-count:]
+        self.crates[target].extend(stack)
+
+    
+    def move_9000(self, instruction: Instruction):
+        count, source, target = instruction
+
+        # 1-ordinal to 0-indexing
+        source -= 1
+        target -= 1
+
+        for _i in range(0, count):
+            crate = self.crates[source].pop()
+            self.crates[target].append(crate)
+
     
     def tops(self) -> str:
         msg = ""
@@ -186,6 +207,15 @@ def part1():
         lines = (line.rstrip('\n') for line in f)
         warehouse, instructions = parse(lines)
     
-    warehouse.run(instructions)
+    warehouse.run_9000(instructions)
+
+    print(warehouse.tops())
+
+def part2():
+    with open("inputs/day5.txt") as f:
+        lines = (line.rstrip('\n') for line in f)
+        warehouse, instructions = parse(lines)
+    
+    warehouse.run_9001(instructions)
 
     print(warehouse.tops())
