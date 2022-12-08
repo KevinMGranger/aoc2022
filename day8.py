@@ -16,7 +16,7 @@ from collections.abc import (
     Reversible,
 )
 from enum import Enum, auto
-from functools import partial, reduce
+from functools import reduce
 import operator
 from textwrap import dedent
 from itertools import product
@@ -329,5 +329,5 @@ def top_score(forest: Forest) -> tuple[Coordinate, int]:
 
 
 def part2():
-    forest = Forest.parse(input(8))
+    forest = Forest.parse(input())
     print(top_score(forest)[1])
