@@ -2,10 +2,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Generator, Iterable, Iterator, NamedTuple, Sequence, TypeAlias
 from functools import reduce
+from enum import Enum, auto
+import io
 
-Dir: TypeAlias = dict[str, int | "Dir"]
+Dir: TypeAlias = "dict[str, int | Dir]"
+Path: TypeAlias = tuple[str, ...]
 
-
+# TODO: would this be better with an immutable walker?
 @dataclass
 class FileSystem:
     children: Dir = field(init=False, default_factory=dict)
@@ -23,8 +26,10 @@ class FileSystem:
                     raise FileNotFoundError
                 case int():
                     raise NotADirectoryError
-                case set() as children:
+                case dict() as children:
                     cur = children
+                case _:
+                    raise TypeError
         return cur
 
     def cd(self, target: str):
@@ -69,12 +74,43 @@ class FileSystem:
                 case size, name:
                     self.fallocate(name, int(size))
 
+    def __str__(self):
+        buf = io.StringIO()
+
+        def print_tree(dir: Dir, indent: int):
+            for name, member in sorted(dir.items(), key=lambda i: i[0]):
+                if isinstance(member, int):
+                    print(
+                        " " * indent,
+                        "- ",
+                        name,
+                        f" (file, size={member})",
+                        sep="",
+                        file=buf,
+                        flush=True,
+                    )
+                elif isinstance(member, dict):
+                    print(
+                        " " * indent, "- ", name, " (dir)", sep="", file=buf, flush=True
+                    )
+                    print_tree(member, indent + 2)
+                else:
+                    raise TypeError
+
+        print("- / (dir)", file=buf)
+        print_tree(self.children, 2)
+
+        return buf.getvalue()
+
+
 def all_file_sizes_below(dir: Dir) -> Iterable[int]:
     for member in dir.values():
         if isinstance(member, int):
             yield member
         elif isinstance(member, dict):
             yield from all_file_sizes_below(member)
+        else:
+            raise TypeError
 
 
 def dir_size(dir: Dir) -> int:
@@ -84,8 +120,38 @@ def dir_size(dir: Dir) -> int:
 DIR_MAX_SIZE_TO_CONSIDER = 100_000
 
 
-def dirs_below_max_size_sizes(dir: Dir) -> Iterable[int]:
-    ...
+def dir_size_depth_first(
+    dir: Dir, path: tuple[str, ...]
+) -> Generator[tuple[tuple[str, ...], int], None, int]:
+    this_dir_sum = 0
+    for name, member in dir.items():
+        if isinstance(member, int):
+            this_dir_sum += member
+        elif isinstance(member, dict):
+            member_sum = yield from dir_size_depth_first(member, (*path, name))
+            this_dir_sum += member_sum
+        else:
+            raise TypeError
+
+    yield path, this_dir_sum
+    return this_dir_sum
+
+
+def sum_of_dirs_below_max(dir: Dir, path: tuple[str, ...]) -> int:
+    return sum(
+        (
+            size
+            for _, size in dir_size_depth_first(dir, path)
+            if size < DIR_MAX_SIZE_TO_CONSIDER
+        )
+    )
+
+
+def part1():
+    fs = FileSystem()
+    with open("inputs/day7.txt") as f:
+        fs.parse(f)
+    print(sum_of_dirs_below_max(fs.children, tuple()))
 
 
 class TEST:
