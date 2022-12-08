@@ -240,47 +240,6 @@ class TEST:
     COLUMN_1 = "32633"
 
 
-@dataclass
-class Visibility:
-    """
-    Lists heights from each direction.
-    """
-
-    height: int
-    left: int | None = None
-    right: int | None = None
-    above: int | None = None
-    below: int | None = None
-
-    @property
-    def visible(self) -> bool | None:
-        height: int | None
-        for height in (
-            getattr(self, attr) for attr in "left right above below".split()
-        ):
-            if height is None:
-                return None
-            if height < self.height:
-                return True
-
-        return False
-
-
-# @dataclass
-# class VisibilityMap(SquareGrid[Visibility]):
-#     rows: tuple[tuple[Visibility, ...], ...]
-
-#     @classmethod
-#     def from_forest(cls, forest: Forest):
-#         self = cls(forest.map(Visibility))
-#         for axis, forward, fixed in product(Axis, (True, False), range(0, len(self))):
-#             line = CoordinateLine(axis, fixed, 0, len(self))
-#             if not forward:
-#                 line = reversed(line)
-
-#         return self
-
-
 def visible_in_dimension(forest: Forest, axis: Axis, num: int) -> set[Coordinate]:
     """
     Coords of all trees visible across the line of forest given.
@@ -367,6 +326,7 @@ def scores(forest: Forest) -> Iterable[tuple[Coordinate, int]]:
 
 def top_score(forest: Forest) -> tuple[Coordinate, int]:
     return max(scores(forest), key=lambda x: x[1])
+
 
 def part2():
     forest = Forest.parse(input(8))
