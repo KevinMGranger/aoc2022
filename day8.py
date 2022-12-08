@@ -32,6 +32,14 @@ class Coordinate(NamedTuple):
     x: int  # i.e. which column
     y: int  # i.e. which row
 
+    @property
+    def row(self):
+        return self.y
+
+    @property
+    def column(self):
+        return self.x
+
 
 class Axis(Enum):
     X = auto()  # i.e. which columns
@@ -164,7 +172,6 @@ class SquareGridIterable(Reversible[tuple[Coordinate, Data]]):
 
 
 class TreeWithHeight(tuple[int, int, int]):
-    # TODO: is there really a point to this any more if we're not composing?
     @property
     def x(self):
         return self[0]
@@ -259,19 +266,19 @@ class Visibility:
         return False
 
 
-@dataclass
-class VisibilityMap(SquareGrid[Visibility]):
-    rows: tuple[tuple[Visibility, ...], ...]
+# @dataclass
+# class VisibilityMap(SquareGrid[Visibility]):
+#     rows: tuple[tuple[Visibility, ...], ...]
 
-    @classmethod
-    def from_forest(cls, forest: Forest):
-        self = cls(forest.map(Visibility))
-        for axis, forward, fixed in product(Axis, (True, False), range(0, len(self))):
-            line = CoordinateLine(axis, fixed, 0, len(self))
-            if not forward:
-                line = reversed(line)
+#     @classmethod
+#     def from_forest(cls, forest: Forest):
+#         self = cls(forest.map(Visibility))
+#         for axis, forward, fixed in product(Axis, (True, False), range(0, len(self))):
+#             line = CoordinateLine(axis, fixed, 0, len(self))
+#             if not forward:
+#                 line = reversed(line)
 
-        return self
+#         return self
 
 
 def visible_in_dimension(forest: Forest, axis: Axis, num: int) -> set[Coordinate]:
@@ -310,3 +317,57 @@ def all_visible(forest: Forest) -> set[Coordinate]:
 def part1():
     forest = Forest.parse(input(8))
     print(sum(1 for _ in all_visible(forest)))
+
+
+def scenic_score_for(forest: Forest, tree: TreeWithHeight) -> int:
+    score = 1
+
+    for axis, forward in product(Axis, (True, False)):
+        match (axis, forward):
+            case Axis.X, True:
+                fixed = tree.x
+                start = tree.y + 1
+                end = len(forest)
+            case Axis.X, False:
+                fixed = tree.x
+                start = tree.y - 1
+                end = -1
+            case Axis.Y, True:
+                fixed = tree.y
+                start = tree.x + 1
+                end = len(forest)
+            case Axis.Y, False:
+                fixed = tree.y
+                start = tree.x - 1
+                end = -1
+            case _:
+                raise ValueError
+
+        line = CoordinateLine(axis, fixed, start, end)
+
+        can_see = 0
+        for coord in line:
+            can_see += 1
+
+            height = forest[coord]
+            if height >= tree.height:
+                break
+
+        score *= can_see
+
+    return score
+
+
+def scores(forest: Forest) -> Iterable[tuple[Coordinate, int]]:
+    for x, y in product(range(0, len(forest)), range(0, len(forest))):
+        tree = TreeWithHeight(x, y, forest[x, y])
+
+        yield tree.coord, scenic_score_for(forest, tree)
+
+
+def top_score(forest: Forest) -> tuple[Coordinate, int]:
+    return max(scores(forest), key=lambda x: x[1])
+
+def part2():
+    forest = Forest.parse(input(8))
+    print(top_score(forest)[1])
