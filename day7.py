@@ -103,24 +103,24 @@ class FileSystem:
         return buf.getvalue()
 
 
-def all_file_sizes_below(dir: Dir) -> Iterable[int]:
+def _all_file_sizes_below(dir: Dir) -> Iterable[int]:
     for member in dir.values():
         if isinstance(member, int):
             yield member
         elif isinstance(member, dict):
-            yield from all_file_sizes_below(member)
+            yield from _all_file_sizes_below(member)
         else:
             raise TypeError
 
 
 def dir_size(dir: Dir) -> int:
-    return sum(all_file_sizes_below(dir))
+    return sum(_all_file_sizes_below(dir))
 
 
 DIR_MAX_SIZE_TO_CONSIDER = 100_000
 
 
-def dir_size_depth_first(
+def _dir_size_depth_first(
     dir: Dir, path: tuple[str, ...]
 ) -> Generator[tuple[tuple[str, ...], int], None, int]:
     this_dir_sum = 0
@@ -128,7 +128,7 @@ def dir_size_depth_first(
         if isinstance(member, int):
             this_dir_sum += member
         elif isinstance(member, dict):
-            member_sum = yield from dir_size_depth_first(member, (*path, name))
+            member_sum = yield from _dir_size_depth_first(member, (*path, name))
             this_dir_sum += member_sum
         else:
             raise TypeError
@@ -141,7 +141,7 @@ def sum_of_dirs_below_max(dir: Dir, path: tuple[str, ...]) -> int:
     return sum(
         (
             size
-            for _, size in dir_size_depth_first(dir, path)
+            for _, size in _dir_size_depth_first(dir, path)
             if size < DIR_MAX_SIZE_TO_CONSIDER
         )
     )
@@ -154,9 +154,38 @@ def part1():
     print(sum_of_dirs_below_max(fs.children, tuple()))
 
 
+TOTAL_DISK_SPACE = 70_000_000
+NEEDED_FOR_UPDATE = 30_000_000
+
+
+def _deletion_candidates(
+    dir: Dir, current_available: int
+) -> Iterable[tuple[Path, int]]:
+    for path, size in _dir_size_depth_first(dir, tuple()):
+        if size + current_available >= NEEDED_FOR_UPDATE:
+            yield path, size
+
+
+def smallest_that_fits(dir: Dir, current_available: int) -> int:
+    return min((size for _, size in _deletion_candidates(dir, current_available)))
+
+
+def part2():
+    fs = FileSystem()
+    with open("inputs/day7.txt") as f:
+        fs.parse(f)
+
+    used = dir_size(fs.children)
+
+    print(smallest_that_fits(fs.children, TOTAL_DISK_SPACE - used))
+
+
 class TEST:
-    ROOT_SIZE = 48381165
-    ANSWER = 95437
+    ROOT_SIZE = 48_381_165
+    SUM_OF_DIRS_BELOW_MAX = 95_437
+    AVAILABLE = 21_618_835
+    assert AVAILABLE == TOTAL_DISK_SPACE - ROOT_SIZE
+
     DATA = """$ cd /
 $ ls
 dir a
