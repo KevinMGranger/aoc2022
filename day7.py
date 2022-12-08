@@ -1,103 +1,117 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import NamedTuple
-from enum import Enum
+from typing import Generator, Iterable, Iterator, NamedTuple, Sequence, TypeAlias
+from functools import reduce
 
-
-class ChdirTarget(Enum):
-    ROOT = "/"
-    PARENT = ".."
-
-
-class ChdirCommand(NamedTuple):
-    target: ChdirTarget | str
-
-
-class ListCommand(NamedTuple):
-    pass
-
-
-class ListEntry:
-    class File(NamedTuple):
-        size: int
-        name: str
-
-    class Dir(NamedTuple):
-        name: str
-
-
-class Path(tuple[str, ...]):
-    def __new__(cls, *elts: str):
-        inst = super().__new__(cls, elts)
-        return inst
-
-    def cd(self, child: str) -> Path:
-        return Path(*self, child)
-
-    def __str__(self):
-        return "/" + "/".join(self)
-
-    @property
-    @classmethod
-    def ROOT(cls):
-        return cls("/")
-
-    @property
-    def parent(self):
-        return Path(*self[:-1])
+Dir: TypeAlias = dict[str, int | "Dir"]
 
 
 @dataclass
 class FileSystem:
-    files: dict[Path, int | set[str]] = field(
-        init=False, default_factory=lambda: {Path.ROOT: set()}
-    )
-    "int for file size, or set of children if directory"
-    context: Path = Path.ROOT
+    children: Dir = field(init=False, default_factory=dict)
+    "int for file size, or dict of children if dir"
 
-    def cd(self, target: ChdirTarget | str):
+    context: list[str] = field(init=False, default_factory=list)
+    "dirs relative to root (empty list)"
+
+    @property
+    def cur_dir(self) -> Dir:
+        cur = self.children
+        for part in self.context:
+            match cur.get(part):
+                case None:
+                    raise FileNotFoundError
+                case int():
+                    raise NotADirectoryError
+                case set() as children:
+                    cur = children
+        return cur
+
+    def cd(self, target: str):
         match target:
-            case ChdirTarget.ROOT:
-                self.context = Path.ROOT
-            case ChdirTarget.PARENT:
-                self.context = self.context.parent
-            case str():
-                target_path = self.context.cd(target)
-                if target_path not in self.files:
-                    raise FileNotFoundError(f"Unknown child {target} in {self.context}")
-                if not isinstance(self.files[target_path], set):
-                    raise NotADirectoryError(
-                        f"child {target} is a file, not a directory within {self.context}"
-                    )
-
-                self.context = target_path
-
-    def get_dir_handle(self, path: Path) -> set[str]:
-        match self.files.get(path):
-            case None:
-                raise FileNotFoundError(f"no dir at {path} found")
-            case int():
-                raise NotADirectoryError(f"file at {path} was not a directory")
-            case set() as children:
-                return children
-
-    def children_handle(self) -> set[str]:
-        return self.get_dir_handle(self.context)
+            case "/":
+                self.context.clear()
+            case "..":
+                self.context.pop()
+            case _:
+                self.context.append(target)
+                # just to check.
+                # this could be nicer. maybe related descriptors?
+                _ = self.cur_dir
 
     def mkdir(self, name: str):
-        children = self.children_handle()
-        target_path = self.context.cd(name)
+        curdir = self.cur_dir
 
-        if target_path in self.files:
+        if name in curdir:
             raise FileExistsError(f"entry {name} already exists within {self.context}")
 
-        self.files[target_path] = set()
-        children.add(name)
+        curdir[name] = {}
 
     def fallocate(self, name: str, size: int):
-        children = self.children_handle()
-        target_path = self.context.cd(name)
+        curdir = self.cur_dir
 
-        if target_path in self.files:
+        if name in curdir:
             raise FileExistsError(f"entry {name} already exists within {self.context}")
-        self.files[target_path] = size
+
+        curdir[name] = size
+
+    def parse(self, input: Iterable[str]):
+        for line in input:
+            line = line.strip()
+            match line.split():
+                case "$", "cd", target:
+                    self.cd(target)
+                case "$", "ls":
+                    # the results are actually context-free, so we can skip this
+                    pass
+                case "dir", dirname:
+                    self.mkdir(dirname)
+                case size, name:
+                    self.fallocate(name, int(size))
+
+def all_file_sizes_below(dir: Dir) -> Iterable[int]:
+    for member in dir.values():
+        if isinstance(member, int):
+            yield member
+        elif isinstance(member, dict):
+            yield from all_file_sizes_below(member)
+
+
+def dir_size(dir: Dir) -> int:
+    return sum(all_file_sizes_below(dir))
+
+
+DIR_MAX_SIZE_TO_CONSIDER = 100_000
+
+
+def dirs_below_max_size_sizes(dir: Dir) -> Iterable[int]:
+    ...
+
+
+class TEST:
+    ROOT_SIZE = 48381165
+    ANSWER = 95437
+    DATA = """$ cd /
+$ ls
+dir a
+14848514 b.txt
+8504156 c.dat
+dir d
+$ cd a
+$ ls
+dir e
+29116 f
+2557 g
+62596 h.lst
+$ cd e
+$ ls
+584 i
+$ cd ..
+$ cd ..
+$ cd d
+$ ls
+4060174 j
+8033020 d.log
+5626152 d.ext
+7214296 k
+"""
