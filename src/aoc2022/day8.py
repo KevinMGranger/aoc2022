@@ -1,5 +1,5 @@
 from __future__ import annotations
-from common import input
+from .common import input
 from dataclasses import dataclass, field, replace
 from typing import (
     NamedTuple,
