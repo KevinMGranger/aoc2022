@@ -2,7 +2,19 @@ from __future__ import annotations
 from .common import input
 from dataclasses import dataclass
 from functools import partial
-from typing import Generator, Callable, Iterable, Iterator, NamedTuple, TypeAlias
+from typing import (
+    Generator,
+    Callable,
+    Iterable,
+    Iterator,
+    NamedTuple,
+    TypeAlias,
+    TextIO,
+)
+import sys
+
+# yes we're using 1-indexing for most things.
+# makes matching it up with the description easier.
 
 OpGen: TypeAlias = Generator[None, None, None]
 
@@ -77,6 +89,30 @@ def part1():
     vm = VM()
     program = filter(sample_is_in_right_cycle, vm.execute(input()))
     print(program_score(program))
+
+
+def crt(program: Iterable[Sample], out: TextIO = sys.stdout):
+    # note that when used as a position,
+    # the sample value is _not_ 1-indexed!
+    samples = iter(program)
+    for row in range(0, 6):
+        for position in range(0, 40):
+            sample = next(samples, None)
+            match sample:
+                case Sample(_, val, _):
+                    lit = position in range(val - 1, val + 2)
+                case None:
+                    lit = False
+                case _:
+                    raise TypeError
+
+            out.write("#" if lit else " ")
+        out.write("\n")
+
+
+def part2():
+    vm = VM()
+    crt(vm.execute(input()))
 
 
 class TEST:
@@ -232,3 +268,11 @@ addx -11
 noop
 noop
 noop"""
+
+    LONG_IMAGE = """##..##..##..##..##..##..##..##..##..##..
+###...###...###...###...###...###...###.
+####....####....####....####....####....
+#####.....#####.....#####.....#####.....
+######......######......######......####
+#######.......#######.......#######.....
+"""  # pylance bug: putting this down a line incorrectly added a hash to the beginning of the line!
