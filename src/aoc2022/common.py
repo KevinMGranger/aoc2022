@@ -1,4 +1,5 @@
-from typing import Iterable
+from __future__ import annotations
+from typing import Iterable, NamedTuple
 import traceback
 import inspect
 from textwrap import dedent
@@ -23,5 +24,29 @@ def input(day: int | None = None) -> Iterable[str]:
 
     # a separate function / generator so the traceback or error is more predictable
     return _line_iter(f"inputs/day{day}.txt")
+
+
+
+# COORDINATE SYSTEM:
+# y / row-major, with the top being 0
+# x / column-minor, with the leftmost being 0
+
+
+class Vector(NamedTuple):
+    x: int  # i.e. which column
+    y: int  # i.e. which row
+
+    @property
+    def row(self):
+        return self.y
+
+    @property
+    def column(self):
+        return self.x
+    
+    def __sub__(self, other: Vector) -> Vector:
+        x, y = self
+        ox, oy = other
+        return Vector(x - ox, y - oy)
 
 __all__ = ["input", "dedent"]

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .common import input
+from .common import input, Vector
 from dataclasses import dataclass, field, replace
 from typing import (
     NamedTuple,
@@ -23,23 +23,6 @@ from itertools import product
 
 # TODO: much of this was overcomplicated because I misidentified the problem in visible_in_dimension.
 
-# COORDINATE SYSTEM:
-# y / row-major, with the top being 0
-# x / column-minor, with the leftmost being 0
-
-
-class Coordinate(NamedTuple):
-    x: int  # i.e. which column
-    y: int  # i.e. which row
-
-    @property
-    def row(self):
-        return self.y
-
-    @property
-    def column(self):
-        return self.x
-
 
 class Axis(Enum):
     X = auto()  # i.e. which columns
@@ -50,7 +33,7 @@ class Axis(Enum):
 
 
 @dataclass
-class CoordinateLine(Sequence[Coordinate], Reversible[Coordinate]):
+class CoordinateLine(Sequence[Vector], Reversible[Vector]):
     axis: Axis
     """
     locked coordinate dimension
@@ -72,25 +55,25 @@ class CoordinateLine(Sequence[Coordinate], Reversible[Coordinate]):
         nums = range(self.start, self.end_exclusive, 1 if self.forward else -1)
 
         return (
-            (Coordinate(x=self.fixed, y=y) for y in nums)
+            (Vector(x=self.fixed, y=y) for y in nums)
             if self.axis is Axis.X
-            else (Coordinate(x=x, y=self.fixed) for x in nums)
+            else (Vector(x=x, y=self.fixed) for x in nums)
         )
 
     def __len__(self):
         return self.end_exclusive - self.start
 
-    def __getitem__(self, index: int) -> Coordinate:
+    def __getitem__(self, index: int) -> Vector:
         return (
-            Coordinate(x=self.fixed, y=index)
+            Vector(x=self.fixed, y=index)
             if self.axis is Axis.X
-            else Coordinate(x=index, y=self.fixed)
+            else Vector(x=index, y=self.fixed)
         )
 
-    def __contains__(self, value: int | Coordinate) -> bool:
+    def __contains__(self, value: int | Vector) -> bool:
         if isinstance(value, int):
             return self.start <= value < self.end_exclusive
-        elif isinstance(value, Coordinate):
+        elif isinstance(value, Vector):
             if self.axis is Axis.X:
                 return self.fixed == value.x and value.y in self
             else:
@@ -154,7 +137,7 @@ class SquareGrid(Generic[Data]):
 
 
 @dataclass(frozen=True)
-class SquareGridIterable(Reversible[tuple[Coordinate, Data]]):
+class SquareGridIterable(Reversible[tuple[Vector, Data]]):
     grid: SquareGrid[Data]
 
     coords: CoordinateLine
@@ -162,7 +145,7 @@ class SquareGridIterable(Reversible[tuple[Coordinate, Data]]):
     def __len__(self):
         return len(self.grid)
 
-    def __iter__(self) -> Iterator[tuple[Coordinate, Data]]:
+    def __iter__(self) -> Iterator[tuple[Vector, Data]]:
         for coord in self.coords:
             data = self.grid[coord]
             yield coord, data
@@ -185,7 +168,7 @@ class TreeWithHeight(tuple[int, int, int]):
         return self[2]
 
     @overload
-    def __new__(cls, coord: Coordinate, height: int, /) -> Self:
+    def __new__(cls, coord: Vector, height: int, /) -> Self:
         ...
 
     @overload
@@ -194,7 +177,7 @@ class TreeWithHeight(tuple[int, int, int]):
 
     def __new__(cls, *args):
         match args:
-            case Coordinate(x, y), int() as height:
+            case Vector(x, y), int() as height:
                 return super().__new__(cls, (x, y, height))
             case int() as x, int() as y, int() as height:
                 return super().__new__(cls, (x, y, height))
@@ -202,8 +185,8 @@ class TreeWithHeight(tuple[int, int, int]):
                 raise TypeError
 
     @property
-    def coordinate(self) -> Coordinate:
-        return Coordinate(self.x, self.y)
+    def coordinate(self) -> Vector:
+        return Vector(self.x, self.y)
 
     @property
     def coord(self):
@@ -240,7 +223,7 @@ class TEST:
     COLUMN_1 = "32633"
 
 
-def visible_in_dimension(forest: Forest, axis: Axis, num: int) -> set[Coordinate]:
+def visible_in_dimension(forest: Forest, axis: Axis, num: int) -> set[Vector]:
     """
     Coords of all trees visible across the line of forest given.
     Does _not_ include trees on edge.
@@ -248,14 +231,14 @@ def visible_in_dimension(forest: Forest, axis: Axis, num: int) -> set[Coordinate
     trees = tuple(TreeWithHeight(*x) for x in forest.over(axis, num))
 
     current_max_height = trees[0].height
-    visible_left: set[Coordinate] = set((trees[0].coord,))
+    visible_left: set[Vector] = set((trees[0].coord,))
     for tree in trees[1:-1]:
         if tree.height > current_max_height:
             visible_left.add(tree.coordinate)
             current_max_height = tree.height
 
     current_max_height = trees[-1].height
-    visible_right: set[Coordinate] = set((trees[-1].coord,))
+    visible_right: set[Vector] = set((trees[-1].coord,))
     for tree in trees[-1:0:-1]:
         if tree.height > current_max_height:
             visible_right.add(tree.coordinate)
@@ -264,8 +247,8 @@ def visible_in_dimension(forest: Forest, axis: Axis, num: int) -> set[Coordinate
     return visible_left | visible_right
 
 
-def all_visible(forest: Forest) -> set[Coordinate]:
-    visibles: list[set[Coordinate]] = []
+def all_visible(forest: Forest) -> set[Vector]:
+    visibles: list[set[Vector]] = []
     for i in range(0, len(forest)):
         visibles.append(visible_in_dimension(forest, Axis.ROW, i))
         visibles.append(visible_in_dimension(forest, Axis.COLUMN, i))
@@ -317,14 +300,14 @@ def scenic_score_for(forest: Forest, tree: TreeWithHeight) -> int:
     return score
 
 
-def scores(forest: Forest) -> Iterable[tuple[Coordinate, int]]:
+def scores(forest: Forest) -> Iterable[tuple[Vector, int]]:
     for x, y in product(range(0, len(forest)), range(0, len(forest))):
         tree = TreeWithHeight(x, y, forest[x, y])
 
         yield tree.coord, scenic_score_for(forest, tree)
 
 
-def top_score(forest: Forest) -> tuple[Coordinate, int]:
+def top_score(forest: Forest) -> tuple[Vector, int]:
     return max(scores(forest), key=lambda x: x[1])
 
 
