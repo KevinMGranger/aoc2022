@@ -254,6 +254,14 @@ Monkey 1: 245, 93, 53, 199, 115
 Monkey 2: 
 Monkey 3: """
 
+    COUNTS_AFTER = {
+            0: 101,
+            1: 95,
+            2: 7,
+            3: 105
+        }
+
+
     def test_round_status(self):
         circus = Circus.parse(self.DATA.splitlines())
 
@@ -292,5 +300,14 @@ Monkey 3: """
 
         run_til_round(round)
         check(collected_lines)
-        
 
+        assert circus.rounds == 20
+
+        actual_count = {id: circus.monkeys[id].inspection_count for id in range(0, 4)}
+        assert actual_count == self.COUNTS_AFTER
+
+        monkeys_by_count = tuple(sorted(actual_count.values(), reverse=True))
+
+        score = monkeys_by_count[0] * monkeys_by_count[1]
+        
+        assert score * 10605
