@@ -37,6 +37,16 @@ class Monke:
 
     inspection_count: int = field(init=False, default=0)
 
+    def __str__(self):
+        return f"""
+        Monkey {self.id}:
+          Starting items: {", ".join(self.items)}
+          Operation: new = {self.operation}
+          Test: {self.test}
+            If true: throw to monkey {self.targets.true}
+            If false: throw to monkey {self.targets.false}
+        """
+
     @classmethod
     def parse(cls, id: int, spec: Iterable[str]):
         speciter = iter(spec)
@@ -96,11 +106,18 @@ def compile_op(op_spec: str) -> Operation:
         r = item if right == OLD else int(right)
         return op(l, r)
 
+    _test.__str__ = lambda self: op_spec
+
     return _test
 
 
 def compile_test(divisor: int) -> Test:
-    return lambda item: (item % divisor) == 0
+    def _check(item: int) -> bool:
+        return (item % divisor) == 0
+
+    _check.__str__ = lambda self: f"divisible by {divisor}"
+
+    return _check
 
 
 @dataclass
@@ -311,3 +328,15 @@ Monkey 3: """
         score = monkeys_by_count[0] * monkeys_by_count[1]
         
         assert score * 10605
+
+def part1():
+    circus = Circus.parse(input())
+
+    while circus.rounds < 21:
+        circus.do_round()
+
+    actual_count = {id: circus.monkeys[id].inspection_count for id in range(0, 4)}
+    monkeys_by_count = tuple(sorted(actual_count.values(), reverse=True))
+
+    score = monkeys_by_count[0] * monkeys_by_count[1]
+    print(score)
