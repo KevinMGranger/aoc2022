@@ -345,3 +345,13 @@ def part1():
     score_ = score(*top_monkeys(circus)[:2])
 
     print(score_)
+
+def part2():
+    circus = Circus.parse(1, input())
+
+    # is this going to break?
+    while circus.rounds != 10_000:
+        circus.do_round()
+    score_ = score(*top_monkeys(circus)[:2])
+
+    print(score_)
