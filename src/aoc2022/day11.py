@@ -3,7 +3,6 @@ import re
 import sys
 from collections import deque
 from dataclasses import dataclass, field
-from functools import partial
 from io import StringIO
 from typing import Callable, Iterable, NamedTuple, TextIO, TypeAlias
 
@@ -24,7 +23,7 @@ class InspectionResult(NamedTuple):
 
 
 Operation: TypeAlias = Callable[[int], int]
-Test: TypeAlias = Callable[[int], bool]
+TestFunc: TypeAlias = Callable[[int], bool]
 
 
 @dataclass
@@ -32,7 +31,7 @@ class Monke:
     id: int
     items: deque[int]
     operation: Operation
-    test: Test
+    test: TestFunc
     targets: Targets
 
     inspection_count: int = field(init=False, default=0)
@@ -40,7 +39,7 @@ class Monke:
     def __str__(self):
         return f"""
         Monkey {self.id}:
-          Starting items: {", ".join(self.items)}
+          Starting items: {", ".join(str(item) for item in self.items)}
           Operation: new = {self.operation}
           Test: {self.test}
             If true: throw to monkey {self.targets.true}
@@ -60,7 +59,8 @@ class Monke:
         true = int(next(speciter).split()[-1])
         false = int(next(speciter).split()[-1])
 
-        return cls(id, 
+        return cls(
+            id,
             starting_items,
             compile_op(op_spec),
             compile_test(test_num),
@@ -111,7 +111,7 @@ def compile_op(op_spec: str) -> Operation:
     return _test
 
 
-def compile_test(divisor: int) -> Test:
+def compile_test(divisor: int) -> TestFunc:
     def _check(item: int) -> bool:
         return (item % divisor) == 0
 
@@ -160,7 +160,10 @@ class Circus:
         self.rounds += 1
 
     def status(self, out: TextIO = sys.stdout):
-        print(f"After round {self.rounds}, the monkeys are holding items with these worry levels:", file=out)
+        print(
+            f"After round {self.rounds}, the monkeys are holding items with these worry levels:",
+            file=out,
+        )
         for i, monkey in enumerate(self.monkeys):
             print("Monkey ", i, ": ", sep="", end="", file=out)
             print(*monkey.items, sep=", ", file=out)
@@ -271,13 +274,7 @@ Monkey 1: 245, 93, 53, 199, 115
 Monkey 2: 
 Monkey 3: """
 
-    COUNTS_AFTER = {
-            0: 101,
-            1: 95,
-            2: 7,
-            3: 105
-        }
-
+    COUNTS_AFTER = {0: 101, 1: 95, 2: 7, 3: 105}
 
     def test_round_status(self):
         circus = Circus.parse(self.DATA.splitlines())
@@ -320,23 +317,30 @@ Monkey 3: """
 
         assert circus.rounds == 20
 
-        actual_count = {id: circus.monkeys[id].inspection_count for id in range(0, 4)}
+        top = top_monkeys(circus)
+
+        actual_count = {monkey.id: monkey.inspection_count for monkey in top}
         assert actual_count == self.COUNTS_AFTER
 
-        monkeys_by_count = tuple(sorted(actual_count.values(), reverse=True))
+        score = top[0].inspection_count * top[1].inspection_count
 
-        score = monkeys_by_count[0] * monkeys_by_count[1]
-        
-        assert score * 10605
+        assert score == 10605
+
+
+def top_monkeys(circus: Circus) -> list[Monke]:
+    return sorted(circus.monkeys, reverse=True, key=lambda m: m.inspection_count)
+
+
+def score(monke1: Monke, monke2: Monke) -> int:
+    return monke1.inspection_count * monke2.inspection_count
+
 
 def part1():
     circus = Circus.parse(input())
 
-    while circus.rounds < 21:
-        circus.do_round()
+    for round_count in range(19, 22):
+        while circus.rounds < round_count:
+            circus.do_round()
+        score_ = score(*top_monkeys(circus)[:2])
 
-    actual_count = {id: circus.monkeys[id].inspection_count for id in range(0, 4)}
-    monkeys_by_count = tuple(sorted(actual_count.values(), reverse=True))
-
-    score = monkeys_by_count[0] * monkeys_by_count[1]
-    print(score)
+        print(round_count, score_)
