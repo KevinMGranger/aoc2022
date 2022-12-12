@@ -28,6 +28,7 @@ TestFunc: TypeAlias = Callable[[int], bool]
 
 @dataclass
 class Monke:
+    worry_divisor: int
     id: int
     items: deque[int]
     operation: Operation
@@ -47,7 +48,7 @@ class Monke:
         """
 
     @classmethod
-    def parse(cls, id: int, spec: Iterable[str]):
+    def parse(cls, worry_divisor: int, id: int, spec: Iterable[str]):
         speciter = iter(spec)
 
         starting_items = deque(
@@ -60,6 +61,7 @@ class Monke:
         false = int(next(speciter).split()[-1])
 
         return cls(
+            worry_divisor,
             id,
             starting_items,
             compile_op(op_spec),
@@ -74,7 +76,7 @@ class Monke:
             return None
 
         item = self.operation(item)
-        item //= 3
+        item //= self.worry_divisor
 
         result = self.test(item)
         target = self.targets.to(result)
@@ -126,7 +128,7 @@ class Circus:
     rounds: int = field(init=False, default=0)
 
     @classmethod
-    def parse(cls, lines: Iterable[str]):
+    def parse(cls, worry_divisor: int, lines: Iterable[str]):
         line_iter = iter(lines)
 
         next(line_iter)  # skip first monke line
@@ -138,13 +140,13 @@ class Circus:
 
         for line in line_iter:
             if line.startswith("Monke"):
-                monkeys.append(Monke.parse(monke_num, monke_spec))
+                monkeys.append(Monke.parse(worry_divisor, monke_num, monke_spec))
                 monke_spec = []
                 monke_num += 1
             else:
                 monke_spec.append(line.strip())
 
-        monkeys.append(Monke.parse(monke_num, monke_spec))
+        monkeys.append(Monke.parse(worry_divisor, monke_num, monke_spec))
 
         return cls(monkeys)
 
@@ -277,7 +279,7 @@ Monkey 3: """
     COUNTS_AFTER = {0: 101, 1: 95, 2: 7, 3: 105}
 
     def test_round_status(self):
-        circus = Circus.parse(self.DATA.splitlines())
+        circus = Circus.parse(3, self.DATA.splitlines())
 
         def run_til_round(round: int):
             while circus.rounds < round:
@@ -336,11 +338,10 @@ def score(monke1: Monke, monke2: Monke) -> int:
 
 
 def part1():
-    circus = Circus.parse(input())
+    circus = Circus.parse(3, input())
 
-    for round_count in range(19, 22):
-        while circus.rounds < round_count:
-            circus.do_round()
-        score_ = score(*top_monkeys(circus)[:2])
+    while circus.rounds != 20:
+        circus.do_round()
+    score_ = score(*top_monkeys(circus)[:2])
 
-        print(round_count, score_)
+    print(score_)
