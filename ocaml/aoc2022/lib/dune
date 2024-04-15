@@ -1,0 +1,4 @@
+(library
+ (name aoc2022)
+ ; (modules_without_implementation daypart)
+ )
